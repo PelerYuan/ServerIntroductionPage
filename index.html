@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Server O&amp;M — Peler Homelab</title>
+<meta name="description" content="A self-built Proxmox homelab: architecture, hardware, virtual machines and the engineering stories behind it.">
+<meta name="theme-color" content="#0a0a0f">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a0a0f'/%3E%3Cpath d='M8 11h16M8 16h16M8 21h16' stroke='%2300d4ff' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preload" href="assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/jbmono-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<div class="glow" id="glow" aria-hidden="true"></div>
+
+<header class="nav" id="nav">
+  <a class="nav__brand" href="#top"><span class="dot"></span>peler<span class="muted">@homelab</span></a>
+  <nav class="nav__links" aria-label="Sections">
+    <a href="#architecture">Architecture</a>
+    <a href="#hardware">Hardware</a>
+    <a href="#services">Services</a>
+    <a href="#engineering">Engineering</a>
+    <a href="#journey">Journey</a>
+    <a href="#writing">Writing</a>
+  </nav>
+  <a class="nav__back" href="#contact">Contact</a>
+</header>
+
+<main id="top">
+
+<!-- HERO -->
+<section class="hero">
+  <div class="grid-bg" aria-hidden="true"></div>
+  <div class="wrap hero__inner">
+   <div class="hero__main">
+    <p class="eyebrow reveal">INFRASTRUCTURE</p>
+    <h1 class="hero__title reveal">Server <span class="grad">O&amp;M</span></h1>
+    <p class="hero__lead reveal">From planning to production. Built, deployed, and kept running — a self-designed virtualization platform that crossed an ocean and came back online.</p>
+
+    <div class="boot reveal" aria-label="Boot log">
+      <div class="boot__bar"><i></i><i></i><i></i><span>peler@homelab — boot</span></div>
+      <pre id="boot" class="boot__body"></pre>
+    </div>
+
+    <div class="uptime reveal">
+      <span class="uptime__label"><span class="pulse"></span>SYSTEM UPTIME — ONLINE &amp; STABLE</span>
+      <div class="uptime__clock" id="uptime" aria-live="off">
+        <div><b id="u-d">000</b><small>DAYS</small></div><em>:</em>
+        <div><b id="u-h">00</b><small>HRS</small></div><em>:</em>
+        <div><b id="u-m">00</b><small>MIN</small></div><em>:</em>
+        <div><b id="u-s">00</b><small>SEC</small></div>
+      </div>
+    </div>
+   </div>
+   <figure class="hero__visual reveal">
+     <button class="shot" data-full="assets/h.jpg"><img src="assets/h.jpg" width="1280" height="1280" alt="The rebuilt homelab glowing in a tempered-glass case."></button>
+     <figcaption><span class="pulse"></span>PelerServer · running today</figcaption>
+   </figure>
+  </div>
+  <a class="scroll-hint" href="#metrics" aria-label="Scroll down"><span></span></a>
+</section>
+
+<!-- METRICS -->
+<section class="metrics" id="metrics">
+  <div class="wrap metrics__grid">
+    <div class="metric reveal"><b data-count="5">0</b><span>Virtual machines</span></div>
+    <div class="metric reveal"><b data-count="16">0</b><span>Threads · i7-10700</span></div>
+    <div class="metric reveal"><b data-count="64" data-suffix=" GB">0</b><span>Memory</span></div>
+    <div class="metric reveal"><b data-count="3.8" data-dec="1" data-suffix=" TB">0</b><span>Raw storage</span></div>
+    <div class="metric reveal"><b data-count="2">0</b><span>GPUs · both passed through</span></div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section class="section" id="architecture">
+  <div class="wrap">
+    <header class="sec-head reveal">
+      <p class="eyebrow">01 — ARCHITECTURE</p>
+      <h2>One host. Five isolated roles.</h2>
+      <p>One Proxmox host, five purpose-built VMs, and a single FRP client that opens the LAN to the outside. Hover a node to inspect it.</p>
+    </header>
+
+    <div class="topo reveal">
+      <svg viewBox="0 0 1100 480" role="img" aria-label="Network topology: the internet reaches an FRP client VM on a Proxmox host, which shares a bridge with four other virtual machines" id="topo">
+        <defs>
+          <linearGradient id="gHost" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#00d4ff" stop-opacity=".07"/>
+            <stop offset="1" stop-color="#7c5cff" stop-opacity=".05"/>
+          </linearGradient>
+          <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 1 L9 5 L0 9z" fill="#00d4ff"/>
+          </marker>
+        </defs>
+
+        <!-- host -->
+        <rect x="250" y="30" width="830" height="420" rx="22" fill="url(#gHost)" stroke="rgba(255,255,255,.14)" stroke-dasharray="4 6"/>
+        <text x="274" y="60" class="t-mono t-dim">PROXMOX VE HOST</text>
+        <text x="1056" y="60" text-anchor="end" class="t-mono t-dim">i7-10700 · 64 GB</text>
+
+        <!-- links -->
+        <path class="link flow" d="M170 230 H280" marker-end="url(#arr)"/>
+        <path class="link flow" d="M450 230 H520"/>
+        <path class="bridge" d="M520 230 H1050"/>
+        <text x="790" y="222" text-anchor="middle" class="t-mono t-cyan">vmbr0 · virtual bridge</text>
+        <path class="link" d="M675 190 V230"/><path class="link" d="M935 190 V230"/>
+        <path class="link" d="M675 270 V230"/><path class="link" d="M935 270 V230"/>
+        <path class="link nfs" d="M560 330 H538 V130 H560"/>
+        <text transform="translate(526 235) rotate(-90)" text-anchor="middle" class="t-mono t-amber">NFS</text>
+
+        <!-- internet -->
+        <g class="node" data-node="cf" tabindex="0">
+          <rect x="20" y="190" width="150" height="80" rx="16"/>
+          <text x="95" y="226" text-anchor="middle" class="t-title">Internet</text>
+          <text x="95" y="248" text-anchor="middle" class="t-mono t-dim">home public IPv4</text>
+        </g>
+        <!-- network -->
+        <g class="node" data-node="frp" tabindex="0">
+          <rect x="280" y="190" width="170" height="80" rx="16"/>
+          <text x="365" y="222" text-anchor="middle" class="t-title">PelerFRP</text>
+          <text x="365" y="245" text-anchor="middle" class="t-mono t-dim">frpc · NAT traversal</text>
+        </g>
+        <!-- server -->
+        <g class="node" data-node="server" tabindex="0">
+          <rect x="560" y="70" width="230" height="120" rx="16"/>
+          <text x="580" y="104" class="t-title">PelerServer</text>
+          <text x="580" y="127" class="t-mono t-dim">Ubuntu · Docker</text>
+          <g class="chip"><rect x="580" y="148" width="64" height="24" rx="12"/><text x="612" y="164" text-anchor="middle">media</text></g>
+          <g class="chip"><rect x="652" y="148" width="64" height="24" rx="12"/><text x="684" y="164" text-anchor="middle">ebooks</text></g>
+          <g class="chip"><rect x="724" y="148" width="54" height="24" rx="12"/><text x="751" y="164" text-anchor="middle">manga</text></g>
+        </g>
+        <!-- computing -->
+        <g class="node" data-node="computing" tabindex="0">
+          <rect x="820" y="70" width="230" height="120" rx="16"/>
+          <text x="840" y="104" class="t-title">PelerComputing</text>
+          <text x="840" y="127" class="t-mono t-dim">Windows · GPU compute</text>
+          <g class="chip chip--hot"><rect x="840" y="148" width="148" height="24" rx="12"/><text x="914" y="164" text-anchor="middle">GPU passthrough</text></g>
+        </g>
+        <!-- storage -->
+        <g class="node" data-node="storage" tabindex="0">
+          <rect x="560" y="270" width="230" height="120" rx="16"/>
+          <text x="580" y="304" class="t-title">PelerStorage</text>
+          <text x="580" y="327" class="t-mono t-dim">OpenMediaVault · NAS</text>
+          <g class="chip chip--warm"><rect x="580" y="348" width="104" height="24" rx="12"/><text x="632" y="364" text-anchor="middle">NFS export</text></g>
+        </g>
+        <!-- agent -->
+        <g class="node" data-node="agent" tabindex="0">
+          <rect x="820" y="270" width="230" height="120" rx="16"/>
+          <text x="840" y="304" class="t-title">PelerAgent</text>
+          <text x="840" y="327" class="t-mono t-dim">Agent workspace</text>
+          <g class="chip"><rect x="840" y="348" width="112" height="24" rx="12"/><text x="896" y="364" text-anchor="middle">remote dev</text></g>
+        </g>
+
+        <text x="274" y="432" class="t-mono t-dim">5 units loaded · 5 active · 0 failed</text>
+      </svg>
+
+      <aside class="topo__panel" id="topo-panel" aria-live="polite">
+        <p class="topo__kicker" id="tp-kicker">NODE</p>
+        <h3 id="tp-title">Select a node</h3>
+        <p id="tp-body">Hover or focus any element in the diagram to see its role in the platform.</p>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- HARDWARE -->
+<section class="section section--alt" id="hardware">
+  <div class="wrap">
+    <header class="sec-head reveal">
+      <p class="eyebrow">02 — HARDWARE</p>
+      <h2>Assembled, not unboxed.</h2>
+      <p>Sourced from existing parts and carefully chosen second-hand components, then designed as one cohesive system — with a deliberate focus on structure, reliability and layout.</p>
+    </header>
+
+    <div class="hw">
+      <div class="term reveal">
+        <div class="term__bar"><i></i><i></i><i></i><span>peler@homelab — Configuration</span></div>
+        <div class="term__body">
+          <p class="cmd">$ cat /etc/server/hardware.conf</p>
+          <dl class="conf">
+            <div><dt>CPU</dt><dd>Intel i7-10700</dd></div>
+            <div><dt>GPU</dt><dd>RTX 2060 Super + Tesla P4</dd></div>
+            <div><dt>Motherboard</dt><dd>ROG MAXIMUS XII HERO</dd></div>
+            <div><dt>Memory</dt><dd>32GB × 2</dd></div>
+            <div><dt>Storage (SSD)</dt><dd>256GB + 512GB</dd></div>
+            <div><dt>Storage (HDD)</dt><dd>1TB + 2TB</dd></div>
+            <div><dt>Power Supply</dt><dd>850W</dd></div>
+          </dl>
+          <p class="cmd">$ <span class="caret"></span></p>
+        </div>
+      </div>
+
+      <div class="hw__side">
+        <div class="card reveal">
+          <h3>Storage layout</h3>
+          <p class="card__sub">Raw capacity by drive — fast tier for VMs, bulk tier for media and backups.</p>
+          <div class="bars">
+            <div class="bar"><span>SSD · 256 GB</span><i style="--w:12.8%" class="ssd"></i></div>
+            <div class="bar"><span>SSD · 512 GB</span><i style="--w:25.6%" class="ssd"></i></div>
+            <div class="bar"><span>HDD · 1 TB</span><i style="--w:50%" class="hdd"></i></div>
+            <div class="bar"><span>HDD · 2 TB</span><i style="--w:100%" class="hdd"></i></div>
+          </div>
+        </div>
+        <div class="card reveal">
+          <h3>Compute &amp; graphics</h3>
+          <ul class="kv">
+            <li><span>Cores / threads</span><b>8 / 16</b></li>
+            <li><span>RTX 2060 Super</span><b>VM passthrough</b></li>
+            <li><span>Tesla P4</span><b>VM passthrough</b></li>
+            <li><span>PSU headroom</span><b>850 W</b></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SERVICES -->
+<section class="section" id="services">
+  <div class="wrap">
+    <header class="sec-head reveal">
+      <p class="eyebrow">03 — SERVICES</p>
+      <h2>Every VM has one job.</h2>
+      <p>Roles are split so a failure, an experiment, or an untrusted workload never takes the rest of the platform with it.</p>
+    </header>
+
+    <div class="vm-grid">
+      <article class="vm reveal" data-node="storage">
+        <div class="vm__top"><span class="led"></span><code>virsh · PelerStorage</code></div>
+        <h3>PelerStorage</h3>
+        <p>OMV-based NAS, providing NFS storage for VM expansion.</p>
+        <ul class="tags"><li>OpenMediaVault</li><li>NFS</li></ul>
+      </article>
+      <article class="vm reveal" data-node="frp">
+        <div class="vm__top"><span class="led"></span><code>virsh · PelerFRP</code></div>
+        <h3>PelerFRP</h3>
+        <p>FRP client giving LAN devices and VMs NAT traversal, so they can be reached from outside.</p>
+        <ul class="tags"><li>frpc</li><li>NAT traversal</li></ul>
+      </article>
+      <article class="vm reveal" data-node="computing">
+        <div class="vm__top"><span class="led"></span><code>virsh · PelerComputing</code></div>
+        <h3>PelerComputing</h3>
+        <p>Windows with GPU passthrough: remote Autodesk Fusion from a MacBook Air, and game streaming when idle.</p>
+        <ul class="tags"><li>Windows</li><li>GPU passthrough</li></ul>
+      </article>
+      <article class="vm reveal" data-node="server">
+        <div class="vm__top"><span class="led"></span><code>virsh · PelerServer</code></div>
+        <h3>PelerServer</h3>
+        <p>Ubuntu host running Docker services — media, ebooks, manga.</p>
+        <ul class="tags"><li>Ubuntu</li><li>Docker Compose</li></ul>
+      </article>
+      <article class="vm reveal" data-node="agent">
+        <div class="vm__top"><span class="led"></span><code>virsh · PelerAgent</code></div>
+        <h3>PelerAgent</h3>
+        <p>Free workspace for agents like Claude Code and Codex, for remote and background development.</p>
+        <ul class="tags"><li>Agent workspace</li><li>Remote dev</li></ul>
+      </article>
+      <article class="vm vm--sum reveal">
+        <div class="vm__top"><code>$ virsh list --all</code></div>
+        <h3>5 / 5 <span>active</span></h3>
+        <p>5 units loaded, 5 active, 0 failed.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ENGINEERING -->
+<section class="section section--alt" id="engineering">
+  <div class="wrap">
+    <header class="sec-head reveal">
+      <p class="eyebrow">04 — ENGINEERING</p>
+      <h2>Problems worth solving.</h2>
+      <p>Two design decisions where the obvious path was closed, and the solution had to be built.</p>
+    </header>
+
+    <article class="case reveal">
+      <div class="case__text">
+        <p class="eyebrow">FEATURED DESIGN</p>
+        <h3>API-driven fan control for a datacenter GPU</h3>
+        <dl class="story">
+          <div><dt>Problem</dt><dd>The Tesla P4 is passive — built for datacenter airflow. A custom 3D-printed fan fixed the cooling, but passing the GPU through to the PelerServer VM meant the Proxmox host could no longer read its temperature.</dd></div>
+          <div><dt>Constraint</dt><dd>The sensor lives inside the VM; the fan controller lives on the host. Neither side can see the other's half.</dd></div>
+          <div><dt>Solution</dt><dd>A decoupled control loop. A custom API on the host drives the DIY fan, while a script inside the VM monitors GPU temperature and calls the API.</dd></div>
+          <div><dt>Outcome</dt><dd>Real-time, temperature-aware fan speed across the virtualization boundary.</dd></div>
+        </dl>
+        <a class="case__link" href="fan-control.html">Read the full write-up <span aria-hidden="true">→</span></a>
+      </div>
+      <figure class="case__fig">
+        <div class="diagram net-fig"><svg class="net" viewBox="0 0 520 304" role="img" aria-labelledby="net-fan-t net-fan-d">
+                  <title id="net-fan-t">Fan control across the VM boundary</title>
+                  <desc id="net-fan-d">Inside the virtual machine, a temperature script reads the passed-through Tesla P4 and calls an API service on the Proxmox host, which drives the 3D-printed fan that cools the card.</desc>
+                  <defs><marker id="net-fan-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1L9 5L0 9Z" class="net__arrowhead" /></marker></defs>
+                  <rect class="net__group" x="16" y="12" width="208" height="188" rx="14" /><text class="net__title" x="32" y="36">Proxmox Host</text>
+                  <rect class="net__group" x="296" y="12" width="208" height="188" rx="14" /><text class="net__title" x="312" y="36">Virtual Machine</text>
+                  <path class="rig__wire rig__wire--data" d="M316 79H206" marker-end="url(#net-fan-arrow)" />
+                  <text class="net__note" x="260" y="70" text-anchor="middle">API call</text>
+                  <path class="rig__wire rig__wire--data" d="M120 99V129" marker-end="url(#net-fan-arrow)" />
+                  <path class="rig__wire rig__wire--data" d="M400 129V101" marker-end="url(#net-fan-arrow)" />
+                  <path class="rig__wire rig__wire--data" d="M120 177V237" marker-end="url(#net-fan-arrow)" />
+                  <text class="net__note" x="128" y="222" text-anchor="start">Power</text>
+                  <path class="rig__wire rig__wire--data" d="M400 237V179" marker-end="url(#net-fan-arrow)" />
+                  <text class="net__note" x="408" y="222" text-anchor="start">Passthrough</text>
+                  <path class="rig__wire rig__wire--data" d="M204 268H314" marker-end="url(#net-fan-arrow)" />
+                  <text class="net__note" x="260" y="259" text-anchor="middle">Cool air</text>
+                  <rect class="rig__box" x="36" y="58" width="168" height="40" rx="8" /><text class="rig__label" x="120" y="82.5">API Service</text>
+                  <rect class="rig__box" x="36" y="136" width="168" height="40" rx="8" /><text class="rig__label" x="120" y="160.5">Chipset Drivers</text>
+                  <rect class="rig__box" x="316" y="58" width="168" height="40" rx="8" /><text class="rig__label" x="400" y="82.5">Temperature Script</text>
+                  <rect class="rig__box" x="316" y="136" width="168" height="40" rx="8" /><text class="rig__label" x="400" y="160.5">GPU Driver</text>
+                  <rect class="rig__box" x="36" y="246" width="168" height="44" rx="8" /><g transform="translate(62 268)"><circle class="net__ring" r="14" /><g class="net__blades"><path transform="rotate(0)" d="M0 -2.5C3 -6 8 -10 11 -6C11 -3 6 -1 2.4 0.8Z" /><path transform="rotate(120)" d="M0 -2.5C3 -6 8 -10 11 -6C11 -3 6 -1 2.4 0.8Z" /><path transform="rotate(240)" d="M0 -2.5C3 -6 8 -10 11 -6C11 -3 6 -1 2.4 0.8Z" /></g><circle class="net__hub" r="2.6" /></g><text class="rig__label" x="142" y="272.5">3D-printed Fan</text>
+                  <rect class="rig__frame" x="316" y="246" width="168" height="44" rx="8" /><text class="rig__label" x="400" y="272.5">Tesla P4</text>
+                </svg></div>
+        <figcaption>Decoupled control loop across the passthrough boundary</figcaption>
+      </figure>
+    </article>
+
+    <article class="case case--rev reveal">
+      <div class="case__text">
+        <p class="eyebrow">QUALITY OF LIFE</p>
+        <h3>Remote lighting control via SSH X11 forwarding</h3>
+        <dl class="story">
+          <div><dt>Problem</dt><dd>Chassis RGB on an ROG motherboard needs vendor software — unavailable on a headless Linux host.</dd></div>
+          <div><dt>Solution</dt><dd>After trying many open-source drivers, OpenRGB ran on the host. SSH X11 forwarding launches its GUI from a laptop.</dd></div>
+          <div><dt>Outcome</dt><dd>All chassis lighting is controlled in real time, without physical access to the machine.</dd></div>
+        </dl>
+        <a class="case__link" href="openrgb.html">Read the full write-up <span aria-hidden="true">→</span></a>
+      </div>
+      <figure class="case__fig">
+        <div class="diagram net-fig"><svg class="net" viewBox="0 0 520 304" role="img" aria-labelledby="net-rgb-t net-rgb-d">
+                  <title id="net-rgb-t">Lighting control over SSH X11 forwarding</title>
+                  <desc id="net-rgb-d">OpenRGB runs on the Proxmox host and talks to the chipset drivers that control the RGB lighting; its window is forwarded over SSH X11 to a laptop.</desc>
+                  <defs><marker id="net-rgb-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1L9 5L0 9Z" class="net__arrowhead" /></marker></defs>
+                  <rect class="net__group" x="296" y="12" width="208" height="188" rx="14" /><text class="net__title" x="312" y="36">Proxmox Host</text>
+                  <path class="rig__wire rig__wire--data" d="M316 79H214" marker-end="url(#net-rgb-arrow)" />
+                  <text class="net__note" x="256" y="70" text-anchor="middle">SSH · X11</text>
+                  <text class="net__note" x="256" y="98" text-anchor="middle">forwarding</text>
+                  <path class="rig__wire rig__wire--data" d="M400 99V129" marker-end="url(#net-rgb-arrow)" />
+                  <path class="rig__wire rig__wire--data" d="M400 177V237" marker-end="url(#net-rgb-arrow)" />
+                  <rect class="rig__box" x="316" y="58" width="168" height="40" rx="8" /><text class="rig__label" x="400" y="82.5">OpenRGB</text>
+                  <rect class="rig__box" x="316" y="136" width="168" height="40" rx="8" /><text class="rig__label" x="400" y="160.5">Chipset Drivers</text>
+                  <g transform="translate(0 24)"><rect class="rig__box" x="20" y="40" width="192" height="134" rx="10" /><path class="rig__thin" d="M20 64H212" /><circle class="net__dot" cx="34" cy="52" r="3" /><circle class="net__dot" cx="45" cy="52" r="3" /><circle class="net__dot" cx="56" cy="52" r="3" /><text class="net__note" x="198" y="56" text-anchor="end">OpenRGB</text><circle class="net__wheel" cx="72" cy="124" r="24" /><circle class="net__knob" cx="89" cy="107" r="4" /><path class="net__track" d="M120 104H190" /><circle class="net__knob" cx="150" cy="104" r="4" /><path class="net__track" d="M120 124H190" /><circle class="net__knob" cx="172" cy="124" r="4" /><path class="net__track" d="M120 144H190" /><circle class="net__knob" cx="136" cy="144" r="4" />
+                  <path class="rig__frame" d="M8 174H224L212 186H20Z" />
+                  <text class="net__note" x="116" y="212" text-anchor="middle">My laptop — anywhere</text></g>
+                  <rect class="rig__box" x="316" y="239" width="168" height="56" rx="8" /><text class="rig__label" x="400" y="263">RGB Lighting</text><circle class="net__led" style="--n: 0" cx="352" cy="281" r="3.5" /><circle class="net__led" style="--n: 1" cx="368" cy="281" r="3.5" /><circle class="net__led" style="--n: 2" cx="384" cy="281" r="3.5" /><circle class="net__led" style="--n: 3" cx="400" cy="281" r="3.5" /><circle class="net__led" style="--n: 4" cx="416" cy="281" r="3.5" /><circle class="net__led" style="--n: 5" cx="432" cy="281" r="3.5" /><circle class="net__led" style="--n: 6" cx="448" cy="281" r="3.5" />
+                </svg></div>
+        <figcaption>OpenRGB on the host, GUI forwarded to the laptop over SSH X11</figcaption>
+      </figure>
+    </article>
+  </div>
+</section>
+
+<!-- JOURNEY -->
+<section class="section" id="journey">
+  <div class="wrap">
+    <header class="sec-head reveal">
+      <p class="eyebrow">05 — JOURNEY</p>
+      <h2>How it got here.</h2>
+    </header>
+
+    <ol class="timeline">
+      <li class="tl reveal" style="--c:#00d4ff">
+        <div class="tl__rail"><i class="tl__dot"></i><i class="tl__line"></i></div>
+        <div class="tl__body">
+          <h3 class="tl__title">Early Exploration</h3>
+          <div class="tl__row">
+            <p>Cloud servers eventually stopped being enough. Out of curiosity, I repurposed an old gaming PC and, with some trial-and-error port forwarding, brought my first self-hosted server online. It wasn't perfect—but it worked. Soon, it became the backbone for late-night Minecraft sessions with friends, and more importantly, my first real step into building systems of my own.</p>
+            <div class="shots shots--thumb">
+              <button class="shot" data-full="assets/a.jpg"><img src="assets/a.jpg" width="480" height="360" loading="lazy" alt="The first self-hosted server: a repurposed gaming PC beside a laptop."></button>
+            </div>
+          </div>
+        </div>
+      </li>
+      <li class="tl reveal" style="--c:#00ff88">
+        <div class="tl__rail"><i class="tl__dot"></i><i class="tl__line"></i></div>
+        <div class="tl__body">
+          <h3 class="tl__title">Continuous Learning</h3>
+          <div class="tl__row">
+            <p>That initial curiosity turned into something more serious. In my spare time, I began helping maintain the school's computer lab, gaining hands-on experience with hardware, troubleshooting, and system upkeep. Along the way, I was guided by a teacher who was a seasoned home lab builder—someone who showed me what was possible beyond just "making things work."</p>
+            <div class="shots shots--thumb">
+              <button class="shot" data-full="assets/b.png"><img src="assets/b.png" width="480" height="360" loading="lazy" alt="Inside a school lab desktop during maintenance."></button>
+            </div>
+          </div>
+        </div>
+      </li>
+      <li class="tl reveal" style="--c:#f59e0b">
+        <div class="tl__rail"><i class="tl__dot"></i><i class="tl__line"></i></div>
+        <div class="tl__body">
+          <h3 class="tl__title">Building My Own System</h3>
+          <div class="tl__row">
+            <p>After graduating from high school, I decided to build something truly mine. Starting from hardware sourcing—mixing existing components with carefully selected second-hand parts—I designed and assembled a server from the ground up. What began as scattered pieces gradually became a cohesive system: one that not only delivers solid performance, but also reflects a deliberate focus on structure, reliability, and design.</p>
+            <div class="shots shots--trio">
+              <button class="shot" data-full="assets/c.jpg"><img src="assets/c.jpg" width="480" height="360" loading="lazy" alt="Applying thermal paste to an Intel Core i7."></button>
+              <button class="shot" data-full="assets/d.jpg"><img src="assets/d.jpg" width="480" height="360" loading="lazy" alt="G.SKILL Trident Z Royal memory on the ROG Maximus XII Hero."></button>
+              <button class="shot" data-full="assets/e.jpg"><img src="assets/e.jpg" width="480" height="360" loading="lazy" alt="A Tesla P4 next to the ROG logo and RGB fans."></button>
+            </div>
+          </div>
+        </div>
+      </li>
+      <li class="tl tl--last reveal" style="--c:#f472b6">
+        <div class="tl__rail"><i class="tl__dot"></i></div>
+        <div class="tl__body">
+          <h3 class="tl__title">Across the Ocean</h3>
+          <div class="tl__row">
+            <p>Disassembled and shipped across the ocean over half a month, the entire system made its way to Australia piece by piece. When it finally arrived, I rebuilt it from the ground up—every component intact, undamaged, and ready to run again.</p>
+            <div class="shots shots--trio">
+              <button class="shot" data-full="assets/f.jpg"><img src="assets/f.jpg" width="480" height="360" loading="lazy" alt="The wrapped shipping box marked fragile."></button>
+              <button class="shot" data-full="assets/g.jpg"><img src="assets/g.jpg" width="480" height="360" loading="lazy" alt="ARGB case fans and a Tesla card unpacked before the rebuild."></button>
+              <button class="shot" data-full="assets/h.jpg"><img src="assets/h.jpg" width="480" height="360" loading="lazy" alt="The rebuilt system glowing in a tempered-glass case."></button>
+            </div>
+          </div>
+        </div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- PRINCIPLES -->
+<section class="section section--alt" id="principles">
+  <div class="wrap">
+    <header class="sec-head reveal">
+      <p class="eyebrow">06 — PRINCIPLES</p>
+      <h2>How I think about infrastructure.</h2>
+    </header>
+    <div class="pr-grid">
+      <div class="pr reveal"><i>01</i><h3>Isolate by role</h3><p>One VM, one responsibility. Agents and experiments get a space of their own.</p></div>
+      <div class="pr reveal"><i>02</i><h3>Publish through one door</h3><p>Everything reachable from outside goes through one FRP client VM.</p></div>
+      <div class="pr reveal"><i>03</i><h3>Decouple across boundaries</h3><p>When hardware and software can't see each other, expose a small API between them instead of forcing a shortcut.</p></div>
+      <div class="pr reveal"><i>04</i><h3>Be rebuildable</h3><p>A system that survived being taken apart and shipped across an ocean is one whose structure is understood end to end.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- WRITING -->
+<section class="section" id="writing">
+  <div class="wrap">
+    <header class="sec-head reveal">
+      <p class="eyebrow">07 — WRITING</p>
+      <h2>Notes from the build.</h2>
+      <p>Two longer write-ups on the engineering decisions above: what broke, what I tried, and why the final design looks the way it does.</p>
+    </header>
+    <div class="notes-grid">
+      <a class="note reveal" href="fan-control.html">
+        <div class="note__img"><img src="assets/fan-cover.jpg" width="1200" height="1200" loading="lazy" alt="Tesla P4 with a 3D-printed shroud and 40 mm fan" style="object-position:50% 55%"></div>
+        <div class="note__body">
+          <span class="note__tag">GPU cooling</span>
+          <h3>A Fan for a GPU the Host Can't See</h3>
+          <p>A passive datacenter GPU, a fan wired to the host, and a temperature that only the VM can read. How a small API bridges the two.</p>
+          <div class="note__meta"><span>6 min read</span><span class="note__go">Read the note →</span></div>
+        </div>
+      </a>
+      <a class="note reveal" href="openrgb.html">
+        <div class="note__img"><img src="assets/rgb-cover.jpg" width="1600" height="1198" loading="lazy" alt="The homelab with chassis lighting on"></div>
+        <div class="note__body">
+          <span class="note__tag">Chassis lighting</span>
+          <h3>Controlling Motherboard RGB on a Headless Proxmox Host</h3>
+          <p>OpenRGB is a GUI program and Proxmox has no desktop. SSH X11 forwarding lets the laptop be the display.</p>
+          <div class="note__meta"><span>4 min read</span><span class="note__go">Read the note →</span></div>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta" id="contact">
+  <div class="wrap reveal">
+    <h2>Questions about the build?</h2>
+    <p>Happy to talk through the architecture, the trade-offs, or how to start your own homelab.</p>
+    <div class="cta__row">
+      <a class="btn btn--primary" href="mailto:xingjian.yuan@student.uq.edu.au">Get in touch</a>    </div>
+  </div>
+</section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot__row">
+    <span>© <span id="year"></span> Xingjian Yuan · Peler</span>
+  </div>
+</footer>
+
+<div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="Photo viewer">
+  <button class="lightbox__close" aria-label="Close">×</button>
+  <img alt="">
+</div>
+
+<script src="main.js"></script>
+</body>
+</html>

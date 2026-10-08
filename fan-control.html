@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A Fan for a GPU the Host Can&#x27;t See — Peler Homelab</title>
+<meta name="description" content="A passive datacenter GPU, a fan wired to the host, and a temperature that only the VM can read. How a small API bridges the two.">
+<meta name="theme-color" content="#0a0a0f">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a0a0f'/%3E%3Cpath d='M8 11h16M8 16h16M8 21h16' stroke='%2300d4ff' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preload" href="assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/jbmono-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<div class="glow" id="glow" aria-hidden="true"></div>
+<header class="nav scrolled" id="nav">
+  <a class="nav__brand" href="index.html"><span class="dot"></span>peler<span class="muted">@homelab</span></a>
+  <nav class="nav__links" aria-label="Notes">
+    <a href="index.html">Overview</a><a href="fan-control.html" class=on>Fan control</a><a href="openrgb.html">Remote RGB</a>
+  </nav>
+  <a class="nav__back" href="index.html#writing">All notes</a>
+</header>
+
+<main class="post">
+  <header class="post-head wrap">
+    <a class="crumb" href="index.html#writing">← Server O&amp;M</a>
+    <p class="eyebrow">ENGINEERING NOTES · GPU COOLING</p>
+    <h1>A Fan for a GPU the Host Can&#x27;t See</h1>
+    <p class="post-meta"><span>Xingjian Yuan</span><i></i><span>Oct 2026</span><i></i><span>6 min read</span></p>
+  </header>
+
+  <div class="wrap"><figure class="post-cover reveal">
+    <img src="assets/fan-cover.jpg" alt="Cover: Tesla P4 with a 3D-printed shroud and 40 mm fan" style="object-position:50% 55%">
+    <figcaption>The Tesla P4 with its 3D-printed shroud and 40 mm fan, the passive card this post is about.</figcaption>
+  </figure></div>
+
+  <div class="wrap post-grid">
+    <aside class="toc" aria-label="Contents"><p class="toc__label">CONTENTS</p><a href="#why-a-datacenter-card-at-all">Why a datacenter card at all</a><a href="#the-card-cooks-itself">The card cooks itself</a><a href="#the-real-problem-the-temperature-lives-on-the-other-side-of-the-wall">The real problem: the temperature lives on the other side of the wall</a><a href="#three-ways-out">Three ways out</a><a href="#the-design-one-api-one-script">The design: one API, one script</a><a href="#failing-loudly-and-safely">Failing loudly and safely</a><a href="#results">Results</a><a href="#what-i-would-change">What I would change</a><a href="#takeaways">Takeaways</a></aside>
+    <article class="prose">
+<p>A Tesla P4 is a datacenter card. It is built to sit in a server chassis with a wall of airflow pushing across it, so it ships with a heatsink and no fan. I bought one for my homelab, put a 3D-printed fan on it, and then ran into a problem that had nothing to do with the fan: the machine that owns the fan cannot read the temperature of the card it is supposed to cool.</p>
+<p>This post is about how I solved that. The short version is a small API on the Proxmox host and a polling script inside a virtual machine. The longer version is about why the obvious alternatives did not work, and why I spent more time on the failure behaviour than on the happy path.</p>
+<figure class="fig"><div class="diagram net-fig"><svg class="net" viewBox="0 0 520 304" role="img" aria-labelledby="net-fan-t net-fan-d">
+                  <title id="net-fan-t">Fan control across the VM boundary</title>
+                  <desc id="net-fan-d">Inside the virtual machine, a temperature script reads the passed-through Tesla P4 and calls an API service on the Proxmox host, which drives the 3D-printed fan that cools the card.</desc>
+                  <defs><marker id="net-fan-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1L9 5L0 9Z" class="net__arrowhead" /></marker></defs>
+                  <rect class="net__group" x="16" y="12" width="208" height="188" rx="14" /><text class="net__title" x="32" y="36">Proxmox Host</text>
+                  <rect class="net__group" x="296" y="12" width="208" height="188" rx="14" /><text class="net__title" x="312" y="36">Virtual Machine</text>
+                  <path class="rig__wire rig__wire--data" d="M316 79H206" marker-end="url(#net-fan-arrow)" />
+                  <text class="net__note" x="260" y="70" text-anchor="middle">API call</text>
+                  <path class="rig__wire rig__wire--data" d="M120 99V129" marker-end="url(#net-fan-arrow)" />
+                  <path class="rig__wire rig__wire--data" d="M400 129V101" marker-end="url(#net-fan-arrow)" />
+                  <path class="rig__wire rig__wire--data" d="M120 177V237" marker-end="url(#net-fan-arrow)" />
+                  <text class="net__note" x="128" y="222" text-anchor="start">Power</text>
+                  <path class="rig__wire rig__wire--data" d="M400 237V179" marker-end="url(#net-fan-arrow)" />
+                  <text class="net__note" x="408" y="222" text-anchor="start">Passthrough</text>
+                  <path class="rig__wire rig__wire--data" d="M204 268H314" marker-end="url(#net-fan-arrow)" />
+                  <text class="net__note" x="260" y="259" text-anchor="middle">Cool air</text>
+                  <rect class="rig__box" x="36" y="58" width="168" height="40" rx="8" /><text class="rig__label" x="120" y="82.5">API Service</text>
+                  <rect class="rig__box" x="36" y="136" width="168" height="40" rx="8" /><text class="rig__label" x="120" y="160.5">Chipset Drivers</text>
+                  <rect class="rig__box" x="316" y="58" width="168" height="40" rx="8" /><text class="rig__label" x="400" y="82.5">Temperature Script</text>
+                  <rect class="rig__box" x="316" y="136" width="168" height="40" rx="8" /><text class="rig__label" x="400" y="160.5">GPU Driver</text>
+                  <rect class="rig__box" x="36" y="246" width="168" height="44" rx="8" /><g transform="translate(62 268)"><circle class="net__ring" r="14" /><g class="net__blades"><path transform="rotate(0)" d="M0 -2.5C3 -6 8 -10 11 -6C11 -3 6 -1 2.4 0.8Z" /><path transform="rotate(120)" d="M0 -2.5C3 -6 8 -10 11 -6C11 -3 6 -1 2.4 0.8Z" /><path transform="rotate(240)" d="M0 -2.5C3 -6 8 -10 11 -6C11 -3 6 -1 2.4 0.8Z" /></g><circle class="net__hub" r="2.6" /></g><text class="rig__label" x="142" y="272.5">3D-printed Fan</text>
+                  <rect class="rig__frame" x="316" y="246" width="168" height="44" rx="8" /><text class="rig__label" x="400" y="272.5">Tesla P4</text>
+                </svg></div><figcaption>The monitoring script in the VM reads the GPU and calls the API service on the Proxmox host. The host reaches the fan through the chipset's PWM control. The GPU temperature never crosses to the host; only a speed request does.</figcaption></figure>
+<h2 id="why-a-datacenter-card-at-all">Why a datacenter card at all</h2>
+<p>I wanted a Tesla compute card of my own, and the P4 was cheap. It also fits what the server does. It draws 75 W, it is physically small, and it can decode and encode video in real time. My NAS-side media services need exactly that when someone is streaming a film, and hardware transcoding keeps the CPU almost idle while it happens.</p>
+<p>The catch is the one that comes with the product category: no active cooling.</p>
+<h2 id="the-card-cooks-itself">The card cooks itself</h2>
+<p>Without a fan, the card sat around 70 °C or higher at idle. Under load it climbed to 90 °C and beyond, at which point it either throttled hard or stopped working. Idle at 70 °C was the useful number. It told me this was not a tuning problem, and that the card needed airflow of its own.</p>
+<p>The mechanical fix was simple. I modelled a shroud in Fusion that holds a 40 mm fan against the heatsink, printed it in PLA, and went through two revisions to get it right. That solved cooling. It did not solve control.</p>
+<h2 id="the-real-problem-the-temperature-lives-on-the-other-side-of-the-wall">The real problem: the temperature lives on the other side of the wall</h2>
+<p>A fixed-speed fan would have worked, but it would have been the wrong answer. The load on this card is very uneven. When it is idle I want the fan nearly silent. When it has been transcoding for hours I want real airflow, and I want the fan to follow the card, not run flat out all day.</p>
+<p>The difficulty is that I pass the P4 through to a virtual machine. Passthrough hands the whole PCI device to the guest. That is what I want for performance, because it removes the virtualisation layer between the VM and the card. It also means the Proxmox host loses visibility. <code>nvidia-smi</code> is unusable on the host, because the card is no longer the host's device.</p>
+<p>The fan, meanwhile, is plugged into the host. So the sensor is inside the VM, the actuator is outside it, and neither side can see the other.</p>
+<h2 id="three-ways-out">Three ways out</h2>
+<div class="tbl"><table><thead><tr><th>Option</th><th>Why I did or didn't take it</th></tr></thead><tbody><tr><td><strong>Follow CPU temperature</strong></td><td>During transcoding the CPU sits at about 10% load and has a large tower cooler, so its fan stays low and steady. The GPU is the part that heats up, and CPU temperature says almost nothing about it.</td></tr><tr><td><strong>Share the GPU with vGPU</strong></td><td>The P4 is an old card and I was not confident about support for it. It would also have meant giving up full passthrough.</td></tr><tr><td><strong>Decouple the two sides with an interface</strong></td><td>Chosen.</td></tr></tbody></table></div>
+<p>The third option was also the one I found most interesting, which counted for something. It keeps passthrough intact, and it leaves me with finer control than a single-sensor setup would give.</p>
+<h2 id="the-design-one-api-one-script">The design: one API, one script</h2>
+<p>The design has two halves that meet over the network.</p>
+<p><strong>On the host.</strong> The fan is plugged into a motherboard PWM header, and speed control goes through the kernel's driver for the board's chipset. I wrapped that in one script that can drive every fan I care about, not only this one but the chassis fans as well. A small Flask service sits on top of the script and exposes three operations:</p>
+<ul><li>set a fan to a given percentage,</li><li>set a fan to a given speed,</li><li>restore the board's default fan control.</li></ul>
+<p>The service listens only on the internal network. The caller is a VM on the same host, and for a home lab I considered that restriction sufficient.</p>
+<p><strong>In the VM.</strong> A script polls the GPU's temperature about every ten seconds and maps it onto a temperature curve. It then asks the host API for the matching fan speed. Ten seconds is comfortable: the card's temperature does not change fast enough to need more, and polling that slowly costs almost nothing.</p>
+<p>The interface is deliberately thin. The VM never learns how the fan is wired, which header it is on or what driver moves it. The host never learns anything about the GPU. The only thing that crosses the boundary is a speed request, and that is the only thing the two sides have to agree on.</p>
+<h2 id="failing-loudly-and-safely">Failing loudly and safely</h2>
+<p>A control loop that spans two machines has more ways to break than a fan header does, so this is where I spent my design effort.</p>
+<p>The API can go down, the script in the VM can die, or the VM can simply be shut down. All three end the same way: control falls back to the motherboard's own fan profile, and I set that profile to run at maximum speed. The failure mode is therefore very specific: the fan gets loud. If I am anywhere near the machine I can hear that something is wrong, and in the meantime the card cannot overheat.</p>
+<p>A silent failure would be the dangerous kind here. A noisy one is just a prompt to go and look. I would defend this choice harder than any other in the design. Optimising for quiet in the working case is fine, but the failure case should always err on the side of cooling.</p>
+<h2 id="results">Results</h2>
+<p>To test under real stress, I ran AI models on the card as a burn-in. Under that load the temperature held at around 60 °C. At idle it settles at roughly 40 °C.</p>
+<p>The more convincing test was ordinary use. I have watched two films back to back, several hours of continuous transcoding, with the card working the whole time. There were no problems, and because the fan follows the temperature curve, it never became a noise issue while I was watching.</p>
+<div class="tbl"><table><thead><tr><th>Condition</th><th>Without a fan</th><th>With the controlled fan</th></tr></thead><tbody><tr><td>Idle</td><td>70 °C and above</td><td>Roughly 40 °C</td></tr><tr><td>Heavy load</td><td>90 °C or higher, throttling or stopping</td><td>About 60 °C</td></tr><tr><td>Several hours of transcoding</td><td>Not viable</td><td>Stable, with controlled noise</td></tr></tbody></table></div>
+<h2 id="what-i-would-change">What I would change</h2>
+<p>Nothing, at the moment. The approach is stable and does not depend on anything exotic. It also has a useful side effect: because every fan sits behind the same host API, I can control them individually and in more detail than the BIOS allows.</p>
+<h2 id="takeaways">Takeaways</h2>
+<p>Three decisions carry most of the weight in this design:</p>
+<ul><li><strong>Keep passthrough and bridge the gap.</strong> Passthrough is the reason the GPU is fast. I did not want to give it up, so I put one interface across the boundary instead.</li><li><strong>Make the interface as small as possible.</strong> The API accepts a speed. Neither side needs to understand the other, which is what makes each side easy to change.</li><li><strong>Fail toward safety.</strong> When the controller goes away, the fan goes to full speed.</li></ul>
+<p>The same idea connects my NAS VM to the machines that mount it: one VM does a job, and the others reach it over the network. Between VMs, and between a VM and its host, a small network API goes a long way.</p>
+    </article>
+  </div>
+
+  <section class="wrap post-more">
+    <p class="eyebrow">NEXT NOTE</p>
+    <a class="note-card" href="openrgb.html">
+      <span class="note-card__tag">Chassis lighting</span>
+      <h3>Controlling Motherboard RGB on a Headless Proxmox Host with SSH X11 Forwarding</h3>
+      <p>OpenRGB is a GUI program and Proxmox has no desktop. SSH X11 forwarding lets the laptop be the display.</p>
+      <span class="note-card__go">Read the note →</span>
+    </a>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot__row"><span>© <span id="year"></span> Xingjian Yuan · Peler</span></div>
+</footer>
+
+<div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="Image viewer">
+  <button class="lightbox__close" aria-label="Close">×</button>
+  <img alt="">
+</div>
+<script src="blog.js"></script>
+</body>
+</html>

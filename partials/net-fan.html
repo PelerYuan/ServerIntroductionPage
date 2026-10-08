@@ -1,0 +1,23 @@
+<svg class="net" viewBox="0 0 520 304" role="img" aria-labelledby="net-fan-t net-fan-d">
+                  <title id="net-fan-t">Fan control across the VM boundary</title>
+                  <desc id="net-fan-d">Inside the virtual machine, a temperature script reads the passed-through Tesla P4 and calls an API service on the Proxmox host, which drives the 3D-printed fan that cools the card.</desc>
+                  <defs><marker id="net-fan-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1L9 5L0 9Z" class="net__arrowhead" /></marker></defs>
+                  <rect class="net__group" x="16" y="12" width="208" height="188" rx="14" /><text class="net__title" x="32" y="36">Proxmox Host</text>
+                  <rect class="net__group" x="296" y="12" width="208" height="188" rx="14" /><text class="net__title" x="312" y="36">Virtual Machine</text>
+                  <path class="rig__wire rig__wire--data" d="M316 79H206" marker-end="url(#net-fan-arrow)" />
+                  <text class="net__note" x="260" y="70" text-anchor="middle">API call</text>
+                  <path class="rig__wire rig__wire--data" d="M120 99V129" marker-end="url(#net-fan-arrow)" />
+                  <path class="rig__wire rig__wire--data" d="M400 129V101" marker-end="url(#net-fan-arrow)" />
+                  <path class="rig__wire rig__wire--data" d="M120 177V237" marker-end="url(#net-fan-arrow)" />
+                  <text class="net__note" x="128" y="222" text-anchor="start">Power</text>
+                  <path class="rig__wire rig__wire--data" d="M400 237V179" marker-end="url(#net-fan-arrow)" />
+                  <text class="net__note" x="408" y="222" text-anchor="start">Passthrough</text>
+                  <path class="rig__wire rig__wire--data" d="M204 268H314" marker-end="url(#net-fan-arrow)" />
+                  <text class="net__note" x="260" y="259" text-anchor="middle">Cool air</text>
+                  <rect class="rig__box" x="36" y="58" width="168" height="40" rx="8" /><text class="rig__label" x="120" y="82.5">API Service</text>
+                  <rect class="rig__box" x="36" y="136" width="168" height="40" rx="8" /><text class="rig__label" x="120" y="160.5">Chipset Drivers</text>
+                  <rect class="rig__box" x="316" y="58" width="168" height="40" rx="8" /><text class="rig__label" x="400" y="82.5">Temperature Script</text>
+                  <rect class="rig__box" x="316" y="136" width="168" height="40" rx="8" /><text class="rig__label" x="400" y="160.5">GPU Driver</text>
+                  <rect class="rig__box" x="36" y="246" width="168" height="44" rx="8" /><g transform="translate(62 268)"><circle class="net__ring" r="14" /><g class="net__blades"><path transform="rotate(0)" d="M0 -2.5C3 -6 8 -10 11 -6C11 -3 6 -1 2.4 0.8Z" /><path transform="rotate(120)" d="M0 -2.5C3 -6 8 -10 11 -6C11 -3 6 -1 2.4 0.8Z" /><path transform="rotate(240)" d="M0 -2.5C3 -6 8 -10 11 -6C11 -3 6 -1 2.4 0.8Z" /></g><circle class="net__hub" r="2.6" /></g><text class="rig__label" x="142" y="272.5">3D-printed Fan</text>
+                  <rect class="rig__frame" x="316" y="246" width="168" height="44" rx="8" /><text class="rig__label" x="400" y="272.5">Tesla P4</text>
+                </svg>

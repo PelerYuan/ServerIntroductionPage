@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controlling Motherboard RGB on a Headless Proxmox Host with SSH X11 Forwarding — Peler Homelab</title>
+<meta name="description" content="OpenRGB is a GUI program and Proxmox has no desktop. SSH X11 forwarding lets the laptop be the display.">
+<meta name="theme-color" content="#0a0a0f">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a0a0f'/%3E%3Cpath d='M8 11h16M8 16h16M8 21h16' stroke='%2300d4ff' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preload" href="assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/jbmono-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<div class="glow" id="glow" aria-hidden="true"></div>
+<header class="nav scrolled" id="nav">
+  <a class="nav__brand" href="index.html"><span class="dot"></span>peler<span class="muted">@homelab</span></a>
+  <nav class="nav__links" aria-label="Notes">
+    <a href="index.html">Overview</a><a href="fan-control.html">Fan control</a><a href="openrgb.html" class=on>Remote RGB</a>
+  </nav>
+  <a class="nav__back" href="index.html#writing">All notes</a>
+</header>
+
+<main class="post">
+  <header class="post-head wrap">
+    <a class="crumb" href="index.html#writing">← Server O&amp;M</a>
+    <p class="eyebrow">ENGINEERING NOTES · CHASSIS LIGHTING</p>
+    <h1>Controlling Motherboard RGB on a Headless Proxmox Host with SSH X11 Forwarding</h1>
+    <p class="post-meta"><span>Xingjian Yuan</span><i></i><span>Oct 2026</span><i></i><span>4 min read</span></p>
+  </header>
+
+  <div class="wrap"><figure class="post-cover reveal">
+    <img src="assets/rgb-cover.jpg" alt="Cover: the homelab with chassis lighting on" style="object-position:50% 50%">
+    <figcaption>The finished homelab with the chassis lighting on, the lighting this post sets up control for.</figcaption>
+  </figure></div>
+
+  <div class="wrap post-grid">
+    <aside class="toc" aria-label="Contents"><p class="toc__label">CONTENTS</p><a href="#why-bother-with-lights">Why bother with lights</a><a href="#two-obstacles">Two obstacles</a><a href="#how-x11-forwarding-solves-it">How X11 forwarding solves it</a><a href="#how-it-behaves-day-to-day">How it behaves day to day</a><a href="#the-alternative-i-haven-t-taken-yet">The alternative I haven&#x27;t taken yet</a><a href="#takeaways">Takeaways</a></aside>
+    <article class="prose">
+<p>I wanted the inside of my homelab to look good, which on an ASUS ROG motherboard means RGB lighting. The software that controls it, OpenRGB, is a graphical program. My host runs Proxmox, and Proxmox has no desktop. A graphical program on a machine with no display has nowhere to draw its window.</p>
+<p>This post is about how I got around that. The answer was SSH X11 forwarding: OpenRGB runs on the host, and its window appears on my Windows laptop. It turned out to be the lowest-friction option I found, and it is the one I still use.</p>
+<figure class="fig"><div class="diagram net-fig"><svg class="net" viewBox="0 0 520 304" role="img" aria-labelledby="net-rgb-t net-rgb-d">
+                  <title id="net-rgb-t">Lighting control over SSH X11 forwarding</title>
+                  <desc id="net-rgb-d">OpenRGB runs on the Proxmox host and talks to the chipset drivers that control the RGB lighting; its window is forwarded over SSH X11 to a laptop.</desc>
+                  <defs><marker id="net-rgb-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1L9 5L0 9Z" class="net__arrowhead" /></marker></defs>
+                  <rect class="net__group" x="296" y="12" width="208" height="188" rx="14" /><text class="net__title" x="312" y="36">Proxmox Host</text>
+                  <path class="rig__wire rig__wire--data" d="M316 79H214" marker-end="url(#net-rgb-arrow)" />
+                  <text class="net__note" x="256" y="70" text-anchor="middle">SSH · X11</text>
+                  <text class="net__note" x="256" y="98" text-anchor="middle">forwarding</text>
+                  <path class="rig__wire rig__wire--data" d="M400 99V129" marker-end="url(#net-rgb-arrow)" />
+                  <path class="rig__wire rig__wire--data" d="M400 177V237" marker-end="url(#net-rgb-arrow)" />
+                  <rect class="rig__box" x="316" y="58" width="168" height="40" rx="8" /><text class="rig__label" x="400" y="82.5">OpenRGB</text>
+                  <rect class="rig__box" x="316" y="136" width="168" height="40" rx="8" /><text class="rig__label" x="400" y="160.5">Chipset Drivers</text>
+                  <g transform="translate(0 24)"><rect class="rig__box" x="20" y="40" width="192" height="134" rx="10" /><path class="rig__thin" d="M20 64H212" /><circle class="net__dot" cx="34" cy="52" r="3" /><circle class="net__dot" cx="45" cy="52" r="3" /><circle class="net__dot" cx="56" cy="52" r="3" /><text class="net__note" x="198" y="56" text-anchor="end">OpenRGB</text><circle class="net__wheel" cx="72" cy="124" r="24" /><circle class="net__knob" cx="89" cy="107" r="4" /><path class="net__track" d="M120 104H190" /><circle class="net__knob" cx="150" cy="104" r="4" /><path class="net__track" d="M120 124H190" /><circle class="net__knob" cx="172" cy="124" r="4" /><path class="net__track" d="M120 144H190" /><circle class="net__knob" cx="136" cy="144" r="4" />
+                  <path class="rig__frame" d="M8 174H224L212 186H20Z" />
+                  <text class="net__note" x="116" y="212" text-anchor="middle">My laptop — anywhere</text></g>
+                  <rect class="rig__box" x="316" y="239" width="168" height="56" rx="8" /><text class="rig__label" x="400" y="263">RGB Lighting</text><circle class="net__led" style="--n: 0" cx="352" cy="281" r="3.5" /><circle class="net__led" style="--n: 1" cx="368" cy="281" r="3.5" /><circle class="net__led" style="--n: 2" cx="384" cy="281" r="3.5" /><circle class="net__led" style="--n: 3" cx="400" cy="281" r="3.5" /><circle class="net__led" style="--n: 4" cx="416" cy="281" r="3.5" /><circle class="net__led" style="--n: 5" cx="432" cy="281" r="3.5" /><circle class="net__led" style="--n: 6" cx="448" cy="281" r="3.5" />
+                </svg></div><figcaption>OpenRGB talks to the chipset drivers on the host to reach the RGB fan lighting. Only the window is forwarded to the laptop; the lighting hardware never leaves the host.</figcaption></figure>
+<h2 id="why-bother-with-lights">Why bother with lights</h2>
+<p>The simple reason is aesthetics. I want a homelab that looks good, and a lit interior behind tempered glass is something I enjoy showing people.</p>
+<p>There is a longer-term reason too. RGB lighting is an output device I already own, wired into the machine. Once I can control it programmatically, I can make it respond to what the server is doing: load, events, state. That is a plan, not something running today, but it shaped the decisions below.</p>
+<h2 id="two-obstacles">Two obstacles</h2>
+<p><strong>A board that drivers don't like.</strong> My motherboard is an ROG board, and many open-source drivers do not support it well. I went through several before finding a working path, and the build that runs now is one I compiled by hand.</p>
+<p><strong>A host with no screen.</strong> Proxmox ships without a desktop environment, which is what a hypervisor should do. But it means a graphical tool has to find some other way to reach a display.</p>
+<h2 id="how-x11-forwarding-solves-it">How X11 forwarding solves it</h2>
+<p>On Linux, a graphical program is an X11 <em>client</em>: it asks a display server to draw windows and deliver input. Normally the client and the display server are on the same machine. X11 forwarding separates them. SSH carries the X protocol over the same encrypted connection as the shell, so the client runs on the remote host while the display server runs on the machine in front of me.</p>
+<p>In my case the display server is already there. My terminal on the laptop is MobaXterm, which includes its own X server. So nothing extra needed setting up on the laptop. I log in over SSH, start OpenRGB on the host, and its window shows up on my screen almost immediately.</p>
+<p>I used this approach again afterwards, because it is the lowest-friction path I know of. There is no extra service to run on the host and no client to install separately.</p>
+<h2 id="how-it-behaves-day-to-day">How it behaves day to day</h2>
+<div class="tbl"><table><thead><tr><th>Aspect</th><th>Experience</th></tr></thead><tbody><tr><td><strong>Persistence</strong></td><td>Settings are saved with OpenRGB's own profile feature. After a reboot, the lighting returns to the last saved state without any action from me. I can also load other colour profile files.</td></tr><tr><td><strong>Latency</strong></td><td>There is a delay between a click in the forwarded window and a change on the hardware. It is under a second, which is fine for something I adjust occasionally.</td></tr><tr><td><strong>Responsiveness</strong></td><td>I have not noticed any stutter in the forwarded interface.</td></tr><tr><td><strong>Security</strong></td><td>The forwarding runs inside an SSH session I already use, so I consider this the least worrying part of the setup.</td></tr></tbody></table></div>
+<p>The honest limitation is that OpenRGB's built-in presets are few. I plan to expand them.</p>
+<h2 id="the-alternative-i-haven-t-taken-yet">The alternative I haven't taken yet</h2>
+<p>OpenRGB also has a server mode, where a separate client controls the lighting over the network. I did not use it, but I have not ruled it out. It is the natural route for what I eventually want: effects that respond to the host's state automatically, so a heavy transcoding job or a VM event could change the colour without me touching anything.</p>
+<p>For a human adjusting colours, forwarding a GUI is simpler. For a machine adjusting colours, a server is the right shape. I expect to end up with both.</p>
+<h2 id="takeaways">Takeaways</h2>
+<ul><li><strong>Don't fight a missing display; borrow one.</strong> The host stays lean, and the laptop provides the screen.</li><li><strong>Pick the path with the least moving parts.</strong> X11 forwarding needed nothing new on my side because my terminal already had an X server.</li><li><strong>Choose the tool for the controller.</strong> A GUI forwarded over SSH suits a person. A server mode suits automation. Which one you need depends on who, or what, is deciding the colour.</li></ul>
+    </article>
+  </div>
+
+  <section class="wrap post-more">
+    <p class="eyebrow">NEXT NOTE</p>
+    <a class="note-card" href="fan-control.html">
+      <span class="note-card__tag">GPU cooling</span>
+      <h3>A Fan for a GPU the Host Can&#x27;t See</h3>
+      <p>A passive datacenter GPU, a fan wired to the host, and a temperature that only the VM can read. How a small API bridges the two.</p>
+      <span class="note-card__go">Read the note →</span>
+    </a>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot__row"><span>© <span id="year"></span> Xingjian Yuan · Peler</span></div>
+</footer>
+
+<div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="Image viewer">
+  <button class="lightbox__close" aria-label="Close">×</button>
+  <img alt="">
+</div>
+<script src="blog.js"></script>
+</body>
+</html>
